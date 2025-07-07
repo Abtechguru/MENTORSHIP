@@ -12,6 +12,18 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
+
+const allowedOrigins = [
+    "http://localhost:5173", //frontend development URL
+    "https://mentorship-frontend-xoig.vercel.app/"
+];
+app.use(cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposedHeaders: ["Set-Cookie"]      
+}));
 app.use("/api/profile", profileRoutes);
 app.use("/api/auth", AuthRoutes)
 app.get("/", (req, res) => {
