@@ -14,10 +14,9 @@ app.use(express.json());
 app.use(cookieParser());
 app.use("/api/profile", profileRoutes);
 app.use("/api/auth", AuthRoutes)
-app.get("/" , (req,res))=>{
-res.json({message:"welcome to backend"})
-
-}
+app.get("/", (req, res) => {
+    res.json({ message: "welcome to backend" });
+});
     // connecting to the database
 connectDb();
 
