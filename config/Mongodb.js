@@ -12,10 +12,9 @@ const connectDb = async () => {
         
         const url = `${process.env.MONGODB_URL}/MentorProject`;
         await mongoose.connect(url);
-        console.log("database connected successfully");
     } catch (error) {
         console.log(error);
     }
 };
 
-export default connectDb; 
+export default connectDb;
