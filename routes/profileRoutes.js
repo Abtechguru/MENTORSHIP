@@ -1,9 +1,13 @@
 import express from "express";
-import { getUserData, EditProfile } from "../controller/profile.js";
+import {getUserData, EditProfile, uploadProfileImage, deleteProfileImage} from "../controller/profile.js"
 import { authMiddleware } from "../middleware/authMiddleware.js";
-const profileRoutes = express.Router();
+import upload from "../middleware/uploadMiddleware.js";
 
-profileRoutes.get("/:id", authMiddleware, getUserData);
-profileRoutes.put("/:id", authMiddleware, EditProfile);
+const ProfileRoutes = express.Router()
 
-export default profileRoutes;
+ProfileRoutes.get("/getUserData/:id", authMiddleware, getUserData);
+ProfileRoutes.put("/editProfile/:id", authMiddleware, EditProfile);
+ProfileRoutes.post("/uploadImage/:id", authMiddleware, upload.single('profileImage'), uploadProfileImage);
+ProfileRoutes.delete("/deleteImage/:id", authMiddleware, deleteProfileImage);
+
+export default ProfileRoutes;

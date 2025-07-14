@@ -1,13 +1,14 @@
-import express from "express";
-import { getMentors, addMentor, bookSession } from "../controller/mentorcontroller.js";
+import express from "express"
+import { addMentor, getMentor, uploadMentorImage, deleteMentorImage, getMentorById,deleteMentor } from "../controller/mentorcontroller.js"
+import upload from "../middleware/uploadMiddleware.js";
 
-const mentorRouter = express.Router();
+const mentorRoutes = express.Router()
 
-// Mentor management routes
-mentorRouter.post("/", addMentor);  
-mentorRouter.get("/", getMentors);   
+mentorRoutes.post("/addMentor", addMentor)
+mentorRoutes.get("/get-mentors", getMentor)
+mentorRoutes.post("/uploadImage/:id", upload.single('profileImage'), uploadMentorImage)
+mentorRoutes.delete("/deleteImage/:id", deleteMentorImage)
+mentorRoutes.get("/getMentorById/:id", getMentorById)
+mentorRoutes.delete("/deleteMentor/:id", deleteMentor)
 
-// Session booking route
-mentorRouter.post("/:mentorId/sessions", bookSession);
-
-export default mentorRouter;
+export default mentorRoutes

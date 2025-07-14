@@ -1,148 +1,134 @@
-import bcrypt from 'bcrypt';
-import validator from 'validator';
-import MentorModel from '../models/mentorSchema.js';
+import bcrypt from "bcryptjs";
+import MentorModel from "../models/mentorSchema.js"
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS || '10');
-const MIN_PASSWORD_LENGTH = 8;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Password validation
-const validatePassword = (password) => {
-  const regex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
-  return regex.test(password);
-};
+const addMentor = async(req,res) =>{
+    const salt = 10
 
-export const addMentor = async (req, res) => {
-  try {
-    const { 
-      name, 
-      email, 
-      availibility = [], 
-      bio = '', 
-      topic = '', 
-      password 
-    } = req.body;
+    try {
+        const {name, email, availability, bio, topic, password, experience} = req.body
 
-    // Input validation
-    if (!name || !email || !password) {
-      return res.status(400).json({ 
-        success: false,
-        message: "Name, email and password are required" 
-      });
+        const hashPassword = await bcrypt.hash(password, salt)
+        
+        const mentor = new MentorModel({
+            name,
+            email,
+            password: hashPassword,
+            availability, 
+            bio, 
+                topic,
+            experience
+        })
+
+        await mentor.save()
+        return res.status(200).json({message: "mentor added successfully"})
+    } catch (error) {
+        console.log(error)
+        return res.status(500).json({message: "Server error"});
     }
+}
 
-    if (!validator.isEmail(email)) {
-      return res.status(400).json({ 
-        success: false,
-        message: "Invalid email format" 
-      });
-    }
-
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      return res.status(400).json({ 
-        success: false,
-        message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters`
-      });
-    }
-
-    if (!validatePassword(password)) {
-      return res.status(400).json({
-        success: false,
-        message: "Password must contain uppercase, lowercase, and numbers"
-      });
-    }
-
-    // Check for existing mentor
-    const existingMentor = await MentorModel.findOne({ email });
-    if (existingMentor) {
-      return res.status(409).json({ 
-        success: false,
-        message: "Email already registered" 
-      });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    
-    // Create and save mentor
-    const mentor = new MentorModel({
-      name,
-      email,
-      availibility,
-      bio,
-      topic,
-      password: hashedPassword
-    });
-    
-    await mentor.save();
-    
-    // Remove password from response
-    const mentorResponse = mentor.toObject();
-    delete mentorResponse.password;
-    
-    return res.status(201).json({ 
-      success: true,
-      message: "Mentor added successfully",
-      data: mentorResponse
-    });
-  } catch (error) {
-    console.error("[MENTOR CONTROLLER ERROR]:", error);
-    return res.status(500).json({ 
-      success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-};
-
-export const bookSession = async (req, res) => {
-  try {
-    return res.status(200).json({ 
-      success: true,
-      message: "Session booked successfully",
-      data: req.body 
-    });
-  } catch (error) {
-    console.error("[SESSION ERROR]:", error);
-    return res.status(500).json({ 
-      success: false,
-      message: "Failed to book session",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-};
-
-export const getMentors = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    const mentors = await MentorModel.find()
-      .select('-password')
-      .skip(skip)
-      .limit(limit);
-
-    const total = await MentorModel.countDocuments();
-
-    return res.status(200).json({
-      success: true,
-      message: "Mentors retrieved successfully",
-      data: {
-        mentors,
-        pagination: {
-          total,
-          page,
-          pages: Math.ceil(total / limit),
-          limit
+const uploadMentorImage = async (req, res) => {
+    try {
+        const {id} = req.params;
+        
+        if (!req.file) {
+            return res.status(400).json({message: "No image file provided"});
         }
-      }
-    });
-  } catch (error) {
-    console.error("[GET MENTORS ERROR]:", error);
-    return res.status(500).json({ 
-      success: false,
-      message: "Failed to fetch mentors",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-};
+
+        const mentor = await MentorModel.findById(id);
+        if (!mentor) {
+            return res.status(404).json({message: "Mentor not found"});
+        }
+
+        // Delete old profile image if it exists
+        if (mentor.profileImage && mentor.profileImage !== "") {
+            const oldImagePath = path.join(__dirname, '../uploads/', mentor.profileImage);
+            if (fs.existsSync(oldImagePath)) {
+                fs.unlinkSync(oldImagePath);
+            }
+        }
+
+        // Update mentor with new image path
+        mentor.profileImage = req.file.filename;
+        await mentor.save();
+
+        return res.status(200).json({
+            message: "Mentor profile image uploaded successfully",
+            profileImage: req.file.filename
+        });
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({message: "Server error"});
+    }
+}
+
+const deleteMentorImage = async (req, res) => {
+    try {
+        const {id} = req.params;
+        
+        const mentor = await MentorModel.findById(id);
+        if (!mentor) {
+            return res.status(404).json({message: "Mentor not found"});
+        }
+
+        // Delete image file if it exists
+        if (mentor.profileImage && mentor.profileImage !== "") {
+            const imagePath = path.join(__dirname, '../uploads/', mentor.profileImage);
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+            }
+        }
+
+        // Remove image reference from mentor
+        mentor.profileImage = "";
+        await mentor.save();
+
+        return res.status(200).json({message: "Mentor profile image deleted successfully"});
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({message: "Server error"});
+    }
+}
+
+const BookSession = async(req,res) =>{
+    try {
+        
+    } catch (error) {
+        
+    }
+}
+
+const getMentor = async(req,res) =>{
+    try {
+        const mentors = await MentorModel.find()
+        res.status(200).json({mentors})
+    } catch (error) {
+        console.log(error)
+        return res.status(500).json({message: "Server error"});
+    }
+}
+const getMentorById = async(req,res) =>{
+    try {
+        const {id} = req.params;
+        const mentor = await MentorModel.findById(id);
+        res.status(200).json({mentor})
+    } catch (error) {
+        console.log(error)
+    }
+}
+const deleteMentor = async(req,res) =>{
+    try {
+        const {id} = req.params;
+        await MentorModel.findByIdAndDelete(id);
+        res.status(200).json({message: "Mentor deleted successfully"})
+    } catch (error) {
+        console.log(error)
+    }
+}
+export {addMentor, BookSession, getMentor, uploadMentorImage, deleteMentorImage , getMentorById , deleteMentor}
